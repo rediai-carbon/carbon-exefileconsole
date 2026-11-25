@@ -1,0 +1,26 @@
+name: linux-exefileconsole
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-exefileconsole-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  launcher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+      - name: Launcher contract
+        run: bash tests/linux_launcher_tests.sh "$PWD/build/ExeFileConsole" "$PWD/build/exefileconsole_stub"
