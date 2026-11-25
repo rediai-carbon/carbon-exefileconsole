@@ -11,7 +11,15 @@ include(cmake/CcpBuildConfigurations.cmake)
 ccp_add_executable(ExeFileConsole
     ExeFileConsole.cpp
 )
-target_compile_definitions(ExeFileConsole PRIVATE NDEBUG _CONSOLE _UNICODE UNICODE)
+if(WIN32)
+    target_compile_definitions(ExeFileConsole PRIVATE NDEBUG _CONSOLE _UNICODE UNICODE)
+else()
+    target_compile_definitions(ExeFileConsole PRIVATE NDEBUG)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(exefileconsole_stub tests/stub_child.cpp)
+endif()
 
 # Provide an install target if this is the top level project only
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)

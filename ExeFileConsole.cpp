@@ -5,6 +5,8 @@
 // and it will work.
 
 #include "stdafx.h"
+
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <string>
@@ -91,3 +93,68 @@ int _tmain( int argc, _TCHAR* argv[] )
 	CloseHandle( pi.hProcess );
 	return exitCode;
 }
+
+#elif defined(__linux__)
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <spawn.h>
+#include <string>
+#include <sys/wait.h>
+#include <unistd.h>
+
+extern char** environ;
+
+int main(int argc, char** argv)
+{
+	char ownPath[4096];
+	ssize_t ownLength = readlink("/proc/self/exe", ownPath, sizeof(ownPath) - 1);
+	if (ownLength <= 0)
+	{
+		std::fprintf(stderr, "ExeFileConsole: could not resolve launcher path\n");
+		return errno ? errno : ENOENT;
+	}
+	ownPath[ownLength] = '\0';
+
+	std::string executable(ownPath);
+	std::string::size_type consoleAt = executable.find("Console");
+	if (consoleAt == std::string::npos)
+	{
+		std::fprintf(stderr, "ExeFileConsole: launcher name does not contain Console\n");
+		return ENOENT;
+	}
+	executable.replace(consoleAt, std::strlen("Console"), "");
+
+	if (setenv("EXEFILE_INHERIT", "", 1) != 0)
+	{
+		std::fprintf(stderr, "ExeFileConsole: could not set EXEFILE_INHERIT\n");
+		return errno;
+	}
+
+	pid_t child = 0;
+	int spawned = posix_spawn(&child, executable.c_str(), nullptr, nullptr, argv, environ);
+	if (spawned != 0)
+	{
+		std::fprintf(stderr, "ExeFileConsole: exec failed: %s\n", std::strerror(spawned));
+		return spawned;
+	}
+
+	int status = 0;
+	if (waitpid(child, &status, 0) < 0)
+	{
+		return errno;
+	}
+	if (WIFEXITED(status))
+	{
+		return WEXITSTATUS(status);
+	}
+	if (WIFSIGNALED(status))
+	{
+		return 128 + WTERMSIG(status);
+	}
+	return 1;
+}
+
+#else
+#error ExeFileConsole has no launcher for this platform
+#endif
