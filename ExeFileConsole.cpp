@@ -116,14 +116,18 @@ int main(int argc, char** argv)
 	}
 	ownPath[ownLength] = '\0';
 
-	std::string executable(ownPath);
-	std::string::size_type consoleAt = executable.find("Console");
+	std::string ownExecutable(ownPath);
+	std::string::size_type slash = ownExecutable.find_last_of('/');
+	std::string directory = slash == std::string::npos ? std::string() : ownExecutable.substr(0, slash + 1);
+	std::string baseName = slash == std::string::npos ? ownExecutable : ownExecutable.substr(slash + 1);
+	std::string::size_type consoleAt = baseName.find("Console");
 	if (consoleAt == std::string::npos)
 	{
 		std::fprintf(stderr, "ExeFileConsole: launcher name does not contain Console\n");
 		return ENOENT;
 	}
-	executable.replace(consoleAt, std::strlen("Console"), "");
+	baseName.replace(consoleAt, std::strlen("Console"), "");
+	std::string executable = directory + baseName;
 
 	if (setenv("EXEFILE_INHERIT", "", 1) != 0)
 	{
@@ -140,7 +144,12 @@ int main(int argc, char** argv)
 	}
 
 	int status = 0;
-	if (waitpid(child, &status, 0) < 0)
+	pid_t waited = 0;
+	do
+	{
+		waited = waitpid(child, &status, 0);
+	} while (waited < 0 && errno == EINTR);
+	if (waited < 0)
 	{
 		return errno;
 	}
